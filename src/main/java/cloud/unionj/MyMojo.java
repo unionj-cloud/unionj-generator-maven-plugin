@@ -27,13 +27,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
+import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.LifecyclePhase;
-import org.apache.maven.plugins.annotations.Mojo;
-import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.plugins.annotations.*;
 import org.apache.maven.project.MavenProject;
+import static org.twdata.maven.mojoexecutor.MojoExecutor.*;
 
 import java.io.File;
 import java.lang.reflect.Method;
@@ -41,8 +42,9 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Properties;
 
-@Mojo(name = "codegen", defaultPhase = LifecyclePhase.COMPILE)
+@Mojo(name = "codegen", defaultPhase = LifecyclePhase.COMPILE, requiresDependencyResolution = ResolutionScope.COMPILE)
 public class MyMojo extends AbstractMojo {
 
   @Parameter(defaultValue = "${project}", required = true, readonly = true)
@@ -72,6 +74,15 @@ public class MyMojo extends AbstractMojo {
   @Parameter(property = "parentVersion")
   String parentVersion;
 
+  @Component
+  private MavenProject mavenProject;
+
+  @Component
+  private MavenSession mavenSession;
+
+  @Component
+  private BuildPluginManager pluginManager;
+
   private ClassLoader getClassLoader(MavenProject project) {
     try {
       List classpathElements = project.getCompileClasspathElements();
@@ -88,6 +99,7 @@ public class MyMojo extends AbstractMojo {
   }
 
   public void execute() throws MojoExecutionException, MojoFailureException {
+
     System.out.println(project.getArtifactId());
     System.out.println(project.getBasedir());
     System.out.println(project.getModules());
@@ -131,5 +143,32 @@ public class MyMojo extends AbstractMojo {
       e.printStackTrace();
     }
     getLog().info("Code generated");
+
+
+    executeMojo(
+        plugin(
+            groupId("pl.project13.maven"),
+            artifactId("git-commit-id-plugin"),
+            version("4.0.0")
+        ),
+        goal("revision"),
+        configuration(
+            element(name("generateGitPropertiesFile"), "false"),
+            element(name("injectIntoSysProperties"), "true")
+        ),
+        executionEnvironment(
+            mavenProject,
+            mavenSession,
+            pluginManager
+        )
+    );
+    Properties properties = System.getProperties();
+    getLog().info("~~~~~~~~~~~~~~~~~~~GIT PROPERTIES~~~~~~~~~~~~~~~~~~~");
+    properties.forEach((k, v) -> {
+      if (k.toString().startsWith("git")) {
+        getLog().info(k + "=" + v);
+      }
+    });
+    getLog().info("~~~~~~~~~~~~~~~~~~~GIT PROPERTIES~~~~~~~~~~~~~~~~~~~");
   }
 }
