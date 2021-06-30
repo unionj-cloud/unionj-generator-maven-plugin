@@ -16,36 +16,34 @@ package cloud.unionj;
  * limitations under the License.
  */
 
-import cloud.unionj.generator.backend.docparser.BackendDocParser;
-import cloud.unionj.generator.backend.docparser.entity.Backend;
-import cloud.unionj.generator.backend.springboot.OutputConfig;
-import cloud.unionj.generator.backend.springboot.OutputType;
-import cloud.unionj.generator.backend.springboot.SpringbootFolderGenerator;
 import cloud.unionj.generator.openapi3.model.Openapi3;
+import cloud.unionj.model.Doc;
+import cloud.unionj.service.EsService;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import org.apache.commons.io.FileUtils;
+import lombok.SneakyThrows;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.BuildPluginManager;
-import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.*;
 import org.apache.maven.project.MavenProject;
-import static org.twdata.maven.mojoexecutor.MojoExecutor.*;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 
 import java.io.File;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Properties;
 
-@Mojo(name = "codegen", defaultPhase = LifecyclePhase.COMPILE, requiresDependencyResolution = ResolutionScope.COMPILE)
-public class MyMojo extends AbstractMojo {
+import static org.twdata.maven.mojoexecutor.MojoExecutor.*;
+
+@Mojo(name = "publish", defaultPhase = LifecyclePhase.DEPLOY, requiresDependencyResolution = ResolutionScope.COMPILE)
+public class Publish extends AbstractMojo {
 
   @Parameter(defaultValue = "${project}", required = true, readonly = true)
   MavenProject project;
@@ -53,26 +51,14 @@ public class MyMojo extends AbstractMojo {
   @Parameter(property = "entry")
   String entry;
 
-  @Parameter(property = "protoPkg")
-  String protoPkg;
+  @Parameter(property = "esAddr")
+  String esAddr;
 
-  @Parameter(property = "protoDir")
-  String protoDir;
+  @Parameter(property = "esIndex")
+  String esIndex;
 
-  @Parameter(property = "voPkg")
-  String voPkg;
-
-  @Parameter(property = "voDir")
-  String voDir;
-
-  @Parameter(property = "parentGroupId")
-  String parentGroupId;
-
-  @Parameter(property = "parentArtifactId")
-  String parentArtifactId;
-
-  @Parameter(property = "parentVersion")
-  String parentVersion;
+  @Parameter(property = "esType")
+  String esType;
 
   @Component
   private MavenProject mavenProject;
@@ -98,53 +84,19 @@ public class MyMojo extends AbstractMojo {
     }
   }
 
-  public void execute() throws MojoExecutionException, MojoFailureException {
-
+  @SneakyThrows
+  public void execute() {
     System.out.println(project.getArtifactId());
     System.out.println(project.getBasedir());
     System.out.println(project.getModules());
     for (Object module : project.getModules()) {
       System.out.println(module);
     }
-    String[] split = this.protoDir.split("/");
-    String protoArtifactId = split[split.length - 1];
-    split = this.voDir.split("/");
-    String voArtifactId = split[split.length - 1];
-    String designClass = "gen.Openapi3Designer";
-    String designMethod = "design";
-    if (this.entry != null && this.entry.length() > 0) {
-      designClass = StringUtils.substring(this.entry, 0, StringUtils.lastIndexOf(this.entry, "."));
-      designMethod = StringUtils.substring(this.entry, StringUtils.lastIndexOf(this.entry, ".") + 1);
-    }
-    try {
-      Class<?> designer = this.getClassLoader(project).loadClass(designClass);
-      Method design = designer.getMethod(designMethod);
-      Openapi3 openAPI = (Openapi3) design.invoke(null);
-      Backend backend = BackendDocParser.parse(openAPI);
-      SpringbootFolderGenerator springbootFolderGenerator = new SpringbootFolderGenerator.Builder(backend)
-          .protoOutput(new OutputConfig(protoPkg, this.protoDir))
-          .voOutput(new OutputConfig(voPkg, this.voDir))
-          .pomProject(true)
-          .pomParentGroupId(parentGroupId)
-          .pomParentArtifactId(parentArtifactId)
-          .pomParentVersion(parentVersion)
-          .pomProtoArtifactId(protoArtifactId)
-          .pomVoArtifactId(voArtifactId)
-          .outputType(OutputType.OVERWRITE)
-          .build();
-      springbootFolderGenerator.generate();
+    System.out.println(esAddr);
+    System.out.println(esIndex);
+    System.out.println(esType);
 
-      ObjectMapper objectMapper = new ObjectMapper();
-      objectMapper.setSerializationInclusion(JsonInclude.Include.NON_EMPTY);
-      objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
-      File oas3SpecFile = new File("openapi3.json");
-      FileUtils.writeStringToFile(oas3SpecFile, objectMapper.writeValueAsString(openAPI), StandardCharsets.UTF_8.name());
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
-    getLog().info("Code generated");
-
-
+    Doc doc = new Doc();
     executeMojo(
         plugin(
             groupId("pl.project13.maven"),
@@ -164,11 +116,73 @@ public class MyMojo extends AbstractMojo {
     );
     Properties properties = System.getProperties();
     getLog().info("~~~~~~~~~~~~~~~~~~~GIT PROPERTIES~~~~~~~~~~~~~~~~~~~");
+    Doc.Git git = new Doc.Git();
     properties.forEach((k, v) -> {
       if (k.toString().startsWith("git")) {
         getLog().info(k + "=" + v);
+        switch (k.toString()) {
+          case "git.branch": {
+            git.setBranch((String) v);
+            break;
+          }
+          case "git.closest.tag.name": {
+            git.setClosestTag((String) v);
+            break;
+          }
+          case "git.commit.time": {
+            // 2021-06-29T13:11:25+0800
+            DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyy-MM-dd'T'HH:mm:ssZ");
+            String commitAt = dateTimeFormatter.parseDateTime((String) v).withZone(DateTimeZone.UTC).toString();
+            git.setCommitAt(commitAt);
+            break;
+          }
+          case "git.commit.id": {
+            git.setCommitId((String) v);
+            break;
+          }
+          case "git.commit.user.name": {
+            git.setCommitUser((String) v);
+            break;
+          }
+          case "git.commit.id.abbrev": {
+            git.setCommitIdAbbr((String) v);
+            break;
+          }
+          case "git.commit.message.full": {
+            git.setFullMessage((String) v);
+            break;
+          }
+        }
       }
     });
     getLog().info("~~~~~~~~~~~~~~~~~~~GIT PROPERTIES~~~~~~~~~~~~~~~~~~~");
+
+    doc.setGit(git);
+    doc.setCreateAt(DateTime.now().withZone(DateTimeZone.UTC).toString());
+
+    String designClass = "gen.Openapi3Designer";
+    String designMethod = "design";
+    if (this.entry != null && this.entry.length() > 0) {
+      designClass = StringUtils.substring(this.entry, 0, StringUtils.lastIndexOf(this.entry, "."));
+      designMethod = StringUtils.substring(this.entry, StringUtils.lastIndexOf(this.entry, ".") + 1);
+    }
+    try {
+      Class<?> designer = this.getClassLoader(project).loadClass(designClass);
+      Method design = designer.getMethod(designMethod);
+      Openapi3 openAPI = (Openapi3) design.invoke(null);
+      if (openAPI.getInfo() != null) {
+        doc.setService(openAPI.getInfo().getTitle());
+        doc.setVersion(openAPI.getInfo().getVersion());
+      }
+      ObjectMapper objectMapper = new ObjectMapper();
+      objectMapper.setSerializationInclusion(JsonInclude.Include.NON_EMPTY);
+      doc.setApi(objectMapper.writeValueAsString(openAPI));
+      EsService esService = new EsService(esAddr, esIndex, esType);
+      String id = esService.indexDoc(doc);
+      System.out.println("Document published to " + esAddr + ". Id is " + id);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    getLog().info("Document published");
   }
 }
