@@ -4,7 +4,7 @@
 
   <groupId>cloud.unionj</groupId>
   <artifactId>unionj-generator-maven-plugin</artifactId>
-  <version>0.0.2-SNAPSHOT</version>
+  <version>0.0.3-SNAPSHOT</version>
   <packaging>maven-plugin</packaging>
 
   <name>unionj-generator-maven-plugin Maven Plugin</name>
@@ -18,7 +18,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.target>1.8</maven.compiler.target>
     <maven.compiler.source>1.8</maven.compiler.source>
-    <unionj-generator.version>1.6-SNAPSHOT</unionj-generator.version>
+    <unionj-generator.version>1.7-SNAPSHOT</unionj-generator.version>
     <git-commit-id-plugin.version>4.0.0</git-commit-id-plugin.version>
   </properties>
 
