@@ -19,7 +19,6 @@ package cloud.unionj;
 import cloud.unionj.generator.backend.docparser.BackendDocParser;
 import cloud.unionj.generator.backend.docparser.entity.Backend;
 import cloud.unionj.generator.backend.springboot.OutputConfig;
-import cloud.unionj.generator.backend.springboot.OutputType;
 import cloud.unionj.generator.backend.springboot.SpringbootFolderGenerator;
 import cloud.unionj.generator.openapi3.model.Openapi3;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -27,12 +26,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
-import org.apache.maven.plugin.BuildPluginManager;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.*;
+import org.apache.maven.plugins.annotations.LifecyclePhase;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 
 import java.io.File;
@@ -41,9 +41,6 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Properties;
-
-import static org.twdata.maven.mojoexecutor.MojoExecutor.*;
 
 @Mojo(name = "codegen", defaultPhase = LifecyclePhase.COMPILE, requiresDependencyResolution = ResolutionScope.COMPILE)
 public class Codegen extends AbstractMojo {
@@ -65,6 +62,18 @@ public class Codegen extends AbstractMojo {
 
   @Parameter(property = "voDir")
   String voDir;
+
+  @Parameter(property = "controllerPkg")
+  String controllerPkg;
+
+  @Parameter(property = "controllerDir")
+  String controllerDir;
+
+  @Parameter(property = "servicePkg")
+  String servicePkg;
+
+  @Parameter(property = "serviceDir")
+  String serviceDir;
 
   @Parameter(property = "parentGroupId")
   String parentGroupId;
@@ -115,13 +124,14 @@ public class Codegen extends AbstractMojo {
       SpringbootFolderGenerator springbootFolderGenerator = new SpringbootFolderGenerator.Builder(backend)
           .protoOutput(new OutputConfig(protoPkg, this.protoDir))
           .voOutput(new OutputConfig(voPkg, this.voDir))
+          .controllerOutput(new OutputConfig(controllerPkg, this.controllerDir))
+          .serviceOutput(new OutputConfig(servicePkg, this.serviceDir))
           .pomProject(true)
           .pomParentGroupId(parentGroupId)
           .pomParentArtifactId(parentArtifactId)
           .pomParentVersion(parentVersion)
           .pomProtoArtifactId(protoArtifactId)
           .pomVoArtifactId(voArtifactId)
-          .outputType(OutputType.OVERWRITE)
           .build();
       springbootFolderGenerator.generate();
 
