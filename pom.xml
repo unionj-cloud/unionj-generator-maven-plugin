@@ -24,7 +24,7 @@
 
   <dependencies>
     <dependency>
-      <groupId>cloud.unionj</groupId>
+      <groupId>io.github.unionj-cloud</groupId>
       <artifactId>unionj-generator-backend</artifactId>
       <version>${unionj-generator.version}</version>
     </dependency>
