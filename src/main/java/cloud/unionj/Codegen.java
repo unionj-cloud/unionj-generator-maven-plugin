@@ -18,6 +18,7 @@ package cloud.unionj;
 
 import cloud.unionj.generator.backend.docparser.BackendDocParser;
 import cloud.unionj.generator.backend.docparser.entity.Backend;
+import cloud.unionj.generator.backend.springboot.Mode;
 import cloud.unionj.generator.backend.springboot.OutputConfig;
 import cloud.unionj.generator.backend.springboot.SpringbootFolderGenerator;
 import cloud.unionj.generator.openapi3.model.Openapi3;
@@ -84,6 +85,9 @@ public class Codegen extends AbstractMojo {
   @Parameter(property = "parentVersion")
   String parentVersion;
 
+  @Parameter(property = "mode")
+  String mode;
+
   private ClassLoader getClassLoader(MavenProject project) {
     try {
       List classpathElements = project.getCompileClasspathElements();
@@ -132,6 +136,7 @@ public class Codegen extends AbstractMojo {
           .pomParentVersion(parentVersion)
           .pomProtoArtifactId(protoArtifactId)
           .pomVoArtifactId(voArtifactId)
+          .mode(StringUtils.equalsIgnoreCase(mode, Mode.BASIC.name()) ? Mode.BASIC : Mode.FULL)
           .build();
       springbootFolderGenerator.generate();
 
