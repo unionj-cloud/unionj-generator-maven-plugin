@@ -110,10 +110,6 @@ public class Codegen extends AbstractMojo {
     for (Object module : project.getModules()) {
       System.out.println(module);
     }
-    String[] split = this.protoDir.split("/");
-    String protoArtifactId = split[split.length - 1];
-    split = this.voDir.split("/");
-    String voArtifactId = split[split.length - 1];
     String designClass = "gen.Openapi3Designer";
     String designMethod = "design";
     if (this.entry != null && this.entry.length() > 0) {
@@ -125,19 +121,44 @@ public class Codegen extends AbstractMojo {
       Method design = designer.getMethod(designMethod);
       Openapi3 openAPI = (Openapi3) design.invoke(null);
       Backend backend = BackendDocParser.parse(openAPI);
-      SpringbootFolderGenerator springbootFolderGenerator = new SpringbootFolderGenerator.Builder(backend)
-          .protoOutput(new OutputConfig(protoPkg, this.protoDir))
-          .voOutput(new OutputConfig(voPkg, this.voDir))
-          .controllerOutput(new OutputConfig(controllerPkg, this.controllerDir))
-          .serviceOutput(new OutputConfig(servicePkg, this.serviceDir))
+      SpringbootFolderGenerator.Builder builder = new SpringbootFolderGenerator.Builder(backend)
           .pomProject(true)
           .pomParentGroupId(parentGroupId)
           .pomParentArtifactId(parentArtifactId)
           .pomParentVersion(parentVersion)
-          .pomProtoArtifactId(protoArtifactId)
-          .pomVoArtifactId(voArtifactId)
-          .mode(StringUtils.equalsIgnoreCase(mode, Mode.BASIC.name()) ? Mode.BASIC : Mode.FULL)
-          .build();
+          .mode(StringUtils.equalsIgnoreCase(this.mode, Mode.BASIC.name()) ? Mode.BASIC : Mode.FULL);
+
+      String protoArtifactId = null;
+      String voArtifactId = null;
+      String controllerArtifactId = null;
+      String serviceArtifactId = null;
+      String[] split;
+      if (this.protoDir != null && this.protoPkg != null) {
+        split = this.protoDir.split("/");
+        protoArtifactId = split[split.length - 1];
+        builder.protoOutput(new OutputConfig(protoPkg, this.protoDir));
+        builder.pomProtoArtifactId(protoArtifactId);
+      }
+      if (this.voDir != null && this.voPkg != null) {
+        split = this.voDir.split("/");
+        voArtifactId = split[split.length - 1];
+        builder.voOutput(new OutputConfig(voPkg, this.voDir));
+        builder.pomVoArtifactId(voArtifactId);
+      }
+      if (this.controllerDir != null && this.controllerPkg != null) {
+        split = this.controllerDir.split("/");
+        controllerArtifactId = split[split.length - 1];
+        builder.controllerOutput(new OutputConfig(controllerPkg, this.controllerDir));
+        builder.pomControllerArtifactId(controllerArtifactId);
+      }
+      if (this.serviceDir != null && this.servicePkg != null) {
+        split = this.serviceDir.split("/");
+        serviceArtifactId = split[split.length - 1];
+        builder.serviceOutput(new OutputConfig(servicePkg, this.serviceDir));
+        builder.pomServiceArtifactId(serviceArtifactId);
+      }
+
+      SpringbootFolderGenerator springbootFolderGenerator = builder.build();
       springbootFolderGenerator.generate();
 
       ObjectMapper objectMapper = new ObjectMapper();
